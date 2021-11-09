@@ -1,12 +1,16 @@
 #include <FastLED.h>
 #include <OneButton.h>
 
-#define NUM_LEDS  35
+const uint8_t DisplayWidth = 14;
+const uint8_t DisplayHeight = 10;
+
+const uint16_t NumLeds = DisplayWidth * DisplayHeight;
+
 #define LED_PIN   6
 #define NextShow_PIN   3  
 #define NumCountUp_PIN   4
 
-CRGB leds[NUM_LEDS];
+CRGB leds[NumLeds];
 
 uint8_t whichNum = 0;
 uint8_t whichShow = 0;
@@ -14,13 +18,91 @@ uint8_t whichShow = 0;
 OneButton NextShowBtn(NextShow_PIN, true, true);
 OneButton NumCountUpBtn(NumCountUp_PIN, true, true);
 
+const uint8_t FontWidth = 7;
+const uint8_t FontHeight = 10;
+const uint8_t NumCharacters = 10;
+
+const uint8_t FontTable[NumCharacters][FontHeight] = {
+	{ 0x7e, 0x7e, 0x66, 0x66, 0x66, 0x66, 0x66, 0x66, 0x7e, 0x7e },  // 0
+	{ 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60 },  // 1
+	{ 0x7e, 0x7e, 0x60, 0x60, 0x7e, 0x7e, 0x06, 0x06, 0x7e, 0x7e },  // 2
+	{ 0x7e, 0x7e, 0x60, 0x60, 0x7c, 0x7c, 0x60, 0x60, 0x7e, 0x7e },  // 3
+	{ 0x66, 0x66, 0x66, 0x66, 0x7e, 0x7e, 0x60, 0x60, 0x60, 0x60 },  // 4
+	{ 0x7e, 0x7e, 0x06, 0x06, 0x7e, 0x7e, 0x60, 0x60, 0x7e, 0x7e },  // 5
+	{ 0x06, 0x06, 0x06, 0x06, 0x7e, 0x7e, 0x66, 0x66, 0x7e, 0x7e },  // 6
+	{ 0x7e, 0x7e, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60, 0x60 },  // 7
+	{ 0x7e, 0x7e, 0x66, 0x66, 0x7e, 0x7e, 0x66, 0x66, 0x7e, 0x7e },  // 8
+	{ 0x7e, 0x7e, 0x66, 0x66, 0x7e, 0x7e, 0x60, 0x60, 0x60, 0x60 }   // 9
+};
+
+const uint8_t NumDigits = DisplayWidth / FontWidth;
+
+
+// Calculate the index for a given LED in the matrix, given its X/Y coordinates
+uint16_t xy(uint16_t x, uint16_t y) {
+	const int RowBase = DisplayWidth * y;  // number of LEDs before the current row
+	if (x >= DisplayWidth) x = DisplayWidth - 1;
+	if (y >= DisplayHeight) y = DisplayHeight - 1;
+
+	uint16_t output;
+	if (y % 2 == 0) output = RowBase + x;  // normal on even rows
+	else output = RowBase + (DisplayWidth - x - 1);  // reversed on odd rows (serpentine)
+
+	if (output >= NumLeds) output = NumLeds - 1;
+
+	return output;
+}
+
+void clearDigit(int pos, CRGB color = CRGB::Black);
+void writeDigit(int pos, int num, CRGB color, CRGB background = CRGB::Black);
+void writeNumber(int num, CRGB color, CRGB background = CRGB::Black);
+
+
+void clearDigit(int pos, CRGB color) {
+	if (pos < 0 || pos >= NumDigits) return;  // display index out of range
+
+	const uint8_t ColumnOffset = FontWidth * pos;  // offset the column position per digit
+
+	for (uint8_t row = 0; row < FontHeight; row++) {
+		for (uint8_t col = 0; col < FontWidth; col++) {
+			leds[xy(col + ColumnOffset, row)] = color;  // assign color to LED array
+		}
+	}
+}
+
+void writeDigit(int pos, int num, CRGB color, CRGB background) {
+	if (num < 0 || num >= NumCharacters) return;  // number out of range
+	if (pos < 0 || pos >= NumDigits) return;  // display index out of range
+
+	const uint8_t* Character = FontTable[num];  // get the font array from the table
+	const uint8_t ColumnOffset = FontWidth * pos;  // offset the column position per digit
+
+	for (uint8_t row = 0; row < FontHeight; row++) {
+		for (uint8_t col = 0; col < FontWidth; col++) {
+			const bool lit = Character[row] & (1 << col);  // extract bit for this LED
+			leds[xy(col + ColumnOffset, row)] = lit ? color : background;  // assign color to LED array
+		}
+	}
+}
+
+void writeNumber(int num, CRGB color, CRGB background) {
+	num = abs(num);  // not supporting negative numbers yet
+
+	for (uint8_t i = 0; i < NumDigits; i++) {
+		uint8_t digit = num % 10;
+		writeDigit(NumDigits - i - 1, digit, color, background);  // right to left
+		num /= 10;
+	}
+}
+
+
 void checkTick() {
     NextShowBtn.tick();
     NumCountUpBtn.tick();
 }
 
 void setup() {
-  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NumLeds);
   FastLED.setBrightness(100);
 
   Serial.begin(115200);
@@ -77,29 +159,8 @@ DisplayNumberShow();
 }
 
 void DisplayNumberShow() {
-  switch (whichNum) {
-    case 0:
-      Num0();
-      break;
-    case 1:
-      Num1();
-      break;
-    case 2:
-      Num2();
-      break;
-    case 3:
-      Num3();
-      break;
-    case 4:
-      Num4();
-      break;
-    case 5:
-      Num5();
-      break;
-    case 6:
-      Num6();
-      break;
-   }
+	writeNumber(whichNum, CRGB::Green);
+}
 
 void FlagShow() {
 	leds[0] = CRGB(0, 0, 255);
@@ -139,11 +200,23 @@ void FlagShow() {
 	leds[34] = CRGB(255, 0, 0);
 }
 void BlinkShow() {
-	fill_solid(leds, NUM_LEDS, CRGB::Red);
+	fill_solid(leds, NumLeds, CRGB::Red);
 	FastLED.show();
 	delay(500);
 	// Now turn the LED off, then pause
-	fill_solid(leds, NUM_LEDS, CRGB::Blue);
+	fill_solid(leds, NumLeds, CRGB::Blue);
 	FastLED.show();
 	delay(500);
+}
+
+// Debug visualization for the LED on/off states
+void printLEDs() {
+	for (uint8_t row = 0; row < DisplayHeight; row++) {
+		for (uint8_t col = 0; col < DisplayWidth; col++) {
+			bool on = leds[xy(col, row)].getLuma() >= 32;  // arbitrary threshold
+			Serial.print(on ? 'X' : '_');
+			Serial.print(" ");
+		}
+		Serial.println();
+	}
 }
