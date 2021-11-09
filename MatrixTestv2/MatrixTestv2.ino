@@ -106,6 +106,7 @@ void ShowNumber() {
 void IncrementNextShow() {
 	whichShow++;
 	if (whichShow >= MaxShow) whichShow = 0;
+	ShowNumber();
 	DebugStatus();
 }
 
