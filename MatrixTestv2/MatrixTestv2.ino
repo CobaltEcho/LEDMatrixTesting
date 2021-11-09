@@ -12,7 +12,10 @@ const uint16_t NumLeds = DisplayWidth * DisplayHeight;
 
 CRGB leds[NumLeds];
 
+const uint8_t MaxNum = 7;
 uint8_t whichNum = 0;
+
+const uint8_t MaxShow = 3;
 uint8_t whichShow = 0;
 
 OneButton NextShowBtn(NextShow_PIN, true, true);
@@ -95,71 +98,52 @@ void writeNumber(int num, CRGB color, CRGB background) {
 	}
 }
 
-
-void checkTick() {
-    NextShowBtn.tick();
-    NumCountUpBtn.tick();
-}
-
-void setup() {
-  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NumLeds);
-  FastLED.setBrightness(100);
-
-  Serial.begin(115200);
-  attachInterrupt(digitalPinToInterrupt(NextShow_PIN),checkTick,CHANGE);
-  attachInterrupt(digitalPinToInterrupt(NumCountUp_PIN),checkTick,CHANGE);
-  NextShowBtn.attachClick(IncrementNextShow);
-  NumCountUpBtn.attachClick(IncrementNumberShow);
-}
-
-void CurrentStatus(){
-  Serial.print("ShowNumber: ");
-  Serial.print(whichShow);
-  Serial.print(" WhichNumber: ");
-  Serial.print(whichNum);
-  Serial.print('\n');
-}
-
-void loop() {
-  NextShowBtn.tick();
-  NumCountUpBtn.tick();
-  FastLED.show();
-
-  while (whichShow == 0) {
-    NextShowBtn.tick();
-    BlinkShow();
-}
+void ShowNumber() {
+	writeNumber(whichNum, CRGB::Blue);
+	printLEDs();
 }
 
 void IncrementNextShow() {
-  whichShow = (whichShow + 1) % 3;
-  CurrentStatus();
-  DisplayNextShow();
-}
-
-void DisplayNextShow() {
-  switch (whichShow){
-    case 0:
-    DisplayNumberShow();
-    break;
-    case 1:
-    FlagShow();
-    break;
-    case 2:
-//    BlinkShow();
-    break;
-  }
-  FastLED.show();
+	whichShow++;
+	if (whichShow >= MaxShow) whichShow = 0;
+	DebugStatus();
 }
 
 void IncrementNumberShow() {
-whichNum = (whichNum + 1) % 7;
-CurrentStatus();
-DisplayNumberShow();
+	whichNum++;
+	if (whichNum >= MaxNum) whichNum = 0;
+	DebugStatus();
+
+	ShowNumber();
 }
 
-void DisplayNumberShow() {
-	writeNumber(whichNum, CRGB::Green);
+void setup() {
+	FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NumLeds);
+	FastLED.setBrightness(100);
+
+	Serial.begin(115200);
+
+	NextShowBtn.attachClick(IncrementNextShow);
+	NumCountUpBtn.attachClick(IncrementNumberShow);
+
+	ShowNumber();
+}
+
+void loop() {
+	NextShowBtn.tick();
+	NumCountUpBtn.tick();
+
+	switch (whichShow) {
+	case 0:
+		break;  // LEDs written in button function
+	case 1:
+		FlagShow();
+		break;
+	case 2:
+		BlinkShow();
+		break;
+	}
+	FastLED.show();
 }
 
 void FlagShow() {
@@ -199,21 +183,37 @@ void FlagShow() {
 	leds[33] = CRGB(255, 0, 0);
 	leds[34] = CRGB(255, 0, 0);
 }
+
 void BlinkShow() {
-	fill_solid(leds, NumLeds, CRGB::Red);
-	FastLED.show();
-	delay(500);
-	// Now turn the LED off, then pause
-	fill_solid(leds, NumLeds, CRGB::Blue);
-	FastLED.show();
-	delay(500);
+	const unsigned long BlinkSpeed = 1000;  // ms
+	static unsigned long lastChange = 0;
+	static bool blinkState = false;
+
+	const unsigned long now = millis();
+
+	if (now - lastChange >= BlinkSpeed) {
+		CRGB color = blinkState ? CRGB::Blue : CRGB::Red;
+		fill_solid(leds, NumLeds, color);
+		FastLED.show();
+
+		lastChange = now;
+		blinkState = !blinkState;
+	}
+}
+
+void DebugStatus() {
+	Serial.print("ShowNumber: ");
+	Serial.print(whichShow);
+	Serial.print(" WhichNumber: ");
+	Serial.print(whichNum);
+	Serial.print('\n');
 }
 
 // Debug visualization for the LED on/off states
 void printLEDs() {
 	for (uint8_t row = 0; row < DisplayHeight; row++) {
 		for (uint8_t col = 0; col < DisplayWidth; col++) {
-			bool on = leds[xy(col, row)].getLuma() >= 32;  // arbitrary threshold
+			bool on = leds[xy(col, row)].getLuma() >= 16;  // arbitrary threshold
 			Serial.print(on ? 'X' : '_');
 			Serial.print(" ");
 		}
