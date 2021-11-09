@@ -12,7 +12,7 @@ const uint16_t NumLeds = DisplayWidth * DisplayHeight;
 
 CRGB leds[NumLeds];
 
-const uint8_t MaxNum = 7;
+const uint8_t MaxNum = 99;
 uint8_t whichNum = 0;
 
 const uint8_t MaxShow = 3;
@@ -111,7 +111,7 @@ void IncrementNextShow() {
 
 void IncrementNumberShow() {
 	whichNum++;
-	if (whichNum >= MaxNum) whichNum = 0;
+	if (whichNum > MaxNum) whichNum = 0;
 	DebugStatus();
 
 	ShowNumber();
