@@ -116,7 +116,7 @@ def main():
 	output = "const uint{}_t FontTable[NumCharacters][FontHeight] = {{".format(max_bytes * 8)
 	for character in characters:
 		output += "\n\t{{ {} }},".format(character['data'])
-	output = output[:-1] + "\n};"  # remove comma, add terminating brace
+	output = output +  "  //" + image_filename + "/n"
 	print(output + '\n')
 
 if __name__ == "__main__":
